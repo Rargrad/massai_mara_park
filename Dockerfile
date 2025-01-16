@@ -1,22 +1,23 @@
-# 빌드 스테이지
-FROM maven:3.9.9-amazoncorretto-17-alpine AS build
+# 빌드 단계
+FROM gradle:8.12-jdk17-alpine AS build
 
 WORKDIR /app
 
-# 종속성 다운로드
-COPY /app/pom.xml .
-RUN mvn dependency:go-offline -B
+# gradle 캐시를 활용하기 위해 필요한 파일 먼저 복사
+COPY build.gradle settings.gradle /app/
+COPY gradle /app/gradle/
+RUN gradle dependencies --no-daemon
 
-# 소스 복사 및 빌드
-COPY /app/src ./src
-RUN mvn package -DskipTests
+# 소스 코드 복사 및 빌드
+COPY src /app
+RUN gradle build --no-daemon -x test
 
-# 실행 스테이지
+# 실행 단계
 FROM amazoncorretto:17-alpine
 
 WORKDIR /app
 
-COPY --from=build /app/target/*.jar app.jar
+COPY --from=build /app/build/libs/*.jar app.jar
 
 ENV JAVA_OPTS="-Xms512m -Xmx512m"
 ENV SERVER_PORT=8080
